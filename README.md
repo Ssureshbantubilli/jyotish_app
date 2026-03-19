@@ -1,14 +1,13 @@
+<<<<<<< HEAD
 # 🪔 Jyotisha — Vedic Astrology App
 
 **The same calculation engine and report style used throughout this conversation, packaged as a full application.**
 
----
 
 ## What This Is
 
 This application programmatically replicates the **exact same** Vedic astrology calculations, interpretations, and report structure used to generate all charts and reports in this conversation — including the charts for Suresh Kumar Bantubilli and Nagasireesha Rayudu.
 
----
 
 ## Project Structure
 
@@ -52,7 +51,6 @@ jyotish_app/
 └── README.md             — This file
 ```
 
----
 
 ## Setup & Run
 
@@ -87,7 +85,6 @@ python -m streamlit run ui/app.py \
 
 Open browser at: **http://localhost:8501**
 
----
 
 ## Calculation Engine Details
 
@@ -112,10 +109,7 @@ Open browser at: **http://localhost:8501**
 ### Verification
 
 The engine produces identical results to the manually computed charts:
-- **Suresh Kumar Bantubilli**: Mithuna Lagna 29°48', Moon Makara 12°42', Shravana Nak
-- **Nagasireesha Rayudu**: Makara Lagna 14°13', Moon Vrischika 28°57', Jyeshtha Nak
 
----
 
 ## Report Sections
 
@@ -137,24 +131,11 @@ The engine produces identical results to the manually computed charts:
 4. Dampati Yoga & Protection Analysis
 
 ### Combined Report
-- Year-by-year scoring 2026–2050 (or any range)
-- Interactive graph with individual + combined lines
-- Phase analysis (Outstanding / Excellent / Challenging years)
-- Dampati Protection Principle identification
 
----
 
 ## Classical Shastra Basis
 
-- **BPHS** — Brihat Parashara Hora Shastra (primary reference)
-- **Brihat Jataka** — Varahamihira's classical text
-- **Phaladeepika** — For yoga and dasha interpretations
-- **Saravali** — House and planet effects
-- **Uttara Kalamrita** — Additional phala references
-- **Jataka Parijata** — Compatibility and dampati analysis
-- **Rigveda 10.85** — Vivaha Sukta (marriage compatibility)
 
----
 
 ## Key Design Decisions
 
@@ -164,6 +145,8 @@ The engine produces identical results to the manually computed charts:
 4. **Deterministic** — Same input always produces same output
 5. **Modular** — Each module can be used independently
 
----
 
 *ॐ तत् सत् — Jyotisha is the Eye of the Vedas*
+=======
+# jyotish_app
+>>>>>>> dd24463ec4a3b1e04c085db104ab5209f54c9e1e
