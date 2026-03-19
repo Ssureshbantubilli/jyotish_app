@@ -21,6 +21,13 @@ from engine.report import (
     generate_compatibility_report,
     generate_combined_report,
 )
+from engine.interpret import (
+    NAK_INTERPRETATION,
+    compute_year_scores,
+    compute_combined_year_scores,
+    calc_ashtakoot,
+)
+from engine import generate_dasha_predictions
 
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -203,11 +210,10 @@ def render_planets(c: dict):
 
     import pandas as pd_lib
     df = pd_lib.DataFrame(rows)
-    st.dataframe(df, hide_index=True, use_container_width=True,
+    st.dataframe(df, hide_index=True, width='stretch',
                  column_config={"House": st.column_config.NumberColumn("House", format="%d")})
 
 def render_nakshatra(c: dict):
-    from engine.interpret import NAK_INTERPRETATION
     st.markdown("#### 🌙 Nakshatra Viveka")
     st.markdown(f"""
     <div class="nak-card">
@@ -256,10 +262,9 @@ def render_dasha(c: dict):
                      "Years": f"{d['years']:.1f}",
                      "": cur})
     df = pd_lib.DataFrame(rows)
-    st.dataframe(df, hide_index=True, use_container_width=True)
+    st.dataframe(df, hide_index=True, width='stretch')
 
 def render_year_forecast(c: dict, label: str = "", yr_from: int = 2025, yr_to: int = 2040):
-    from engine.interpret import compute_year_scores
     import plotly.graph_objects as go
 
     st.markdown(f"#### 📈 Year-Wise Forecast {f'— {label}' if label else ''}({yr_from}–{yr_to})")
@@ -298,13 +303,13 @@ def render_year_forecast(c: dict, label: str = "", yr_from: int = 2025, yr_to: i
         margin=dict(t=20,b=40,l=40,r=80),
         showlegend=False,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     import pandas as pd_lib
     rows = [{"Year":r["year"],"MD":r["md_lord"],"AD":r["ad_lord"],
              "Score":r["score"],"Category":r["category"]} for r in scores]
     with st.expander("📋 Full Score Table"):
-        st.dataframe(pd_lib.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd_lib.DataFrame(rows), hide_index=True, width='stretch')
 
 def render_combined_graph(cs: list, s1: list, s2: list, name1: str, name2: str):
     import plotly.graph_objects as go
@@ -355,7 +360,7 @@ def render_combined_graph(cs: list, s1: list, s2: list, name1: str, name2: str):
         legend=dict(bgcolor="#0E1117",bordercolor="#2A2A3A"),
         margin=dict(t=20,b=60,l=40,r=100),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 def render_koota(milan: dict):
     st.markdown("#### 🔢 Ashtakoot Milan (36-Point Analysis)")
@@ -374,7 +379,7 @@ def render_koota(milan: dict):
     rows = [{"Koota":k, "Score":v["score"], "Max":v["max"],
              "Detail":v["detail"], "Remark":v["remark"]}
             for k,v in milan["kootas"].items()]
-    st.dataframe(pd_lib.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd_lib.DataFrame(rows), hide_index=True, width='stretch')
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PREDICTION RENDER FUNCTIONS
@@ -400,8 +405,6 @@ AREA_LABEL = {
 }
 
 def render_predictions_tab(chart: dict, name: str, yr_from: int, yr_to: int):
-    from engine import generate_dasha_predictions
-
     preds = generate_dasha_predictions(chart, yr_from, yr_to)
     if not preds:
         st.info("No dasha periods found within the selected year range.")
@@ -524,7 +527,7 @@ def render_predictions_tab(chart: dict, name: str, yr_from: int, yr_to: int):
 
 def render_combined_predictions_tab(chart1: dict, chart2: dict,
                                      n1: str, n2: str, yr_from: int, yr_to: int):
-    from engine import generate_dasha_predictions, compute_combined_year_scores
+    # generate_dasha_predictions and compute_combined_year_scores available at module level
     import pandas as pd_lib
 
     cs_all = compute_combined_year_scores(chart1, chart2, yr_from, yr_to)
@@ -583,7 +586,7 @@ def render_combined_predictions_tab(chart1: dict, chart2: dict,
             "Category": r["category"],
             "Dynamic": dynamic,
         })
-    st.dataframe(pd_lib.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd_lib.DataFrame(rows), hide_index=True, width='stretch')
 
     st.markdown("---")
 
@@ -644,7 +647,7 @@ def render_combined_predictions_tab(chart1: dict, chart2: dict,
 if mode == "🔮 Individual Report":
     with st.form("individual_form"):
         name, dob, tob_h, place = person_form("p1", "📋 Enter Birth Details")
-        submitted = st.form_submit_button("🪔 Generate Vedic Report", use_container_width=True)
+        submitted = st.form_submit_button("🪔 Generate Vedic Report", width='stretch')
 
     if submitted:
         if not name.strip():
@@ -686,10 +689,32 @@ if mode == "🔮 Individual Report":
             # Full text report download
             with st.expander("📄 Full Text Report (BPHS Style)"):
                 report_text = generate_individual_report(chart, place)
-                st.text_area("", report_text, height=500, label_visibility="collapsed")
+                st.text_area("Full Report", report_text, height=500, label_visibility="collapsed")
                 st.download_button("⬇ Download Report (.txt)", report_text,
                                    file_name=f"{name.replace(' ','_')}_Jyotish_Report.txt",
-                                   mime="text/plain", use_container_width=True)
+                                   mime="text/plain", width='stretch')
+
+            # ── Enhanced Report Downloads (Infographic + Document) ──────────────
+            st.markdown("---")
+            with st.expander("📦 Download Enhanced Reports (Infographic & Document)"):
+                from ui.report_html import generate_individual_html as _gih
+                from ui.report_docx import generate_individual_docx as _gid
+                import datetime as _dt_i
+                _yf_i = _dt_i.date.today().year - 2
+                _yt_i = _dt_i.date.today().year + 25
+                _sc_i = compute_year_scores(chart, _yf_i, _yt_i)
+                _pr_i = generate_dasha_predictions(chart, _yf_i, _yt_i)
+                _html_i = _gih(chart, name, place, dob, tob_h, _sc_i, _pr_i).encode("utf-8")
+                _docx_i = _gid(chart, name, place, dob, tob_h, _sc_i, _pr_i)
+                _dc1_i, _dc2_i = st.columns(2)
+                _dc1_i.download_button("📊 Infographic Report (.html)", _html_i,
+                    file_name=f"{name.replace(' ','_')}_Jyotisha_Infographic.html",
+                    mime="text/html", width='stretch', type="primary")
+                _dc2_i.download_button("📄 Document Report (.docx)", _docx_i,
+                    file_name=f"{name.replace(' ','_')}_Jyotisha_Report.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    width='stretch')
+                st.caption("📊 Infographic opens in any browser with visual charts and color-coded predictions. 📄 Document opens in Word or Google Docs with full narrative.")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MODE: COMPATIBILITY
@@ -708,7 +733,7 @@ elif mode == "💑 Spouse Compatibility":
             n2,d2,t2,p2 = person_form("w","")
             s2 = st.form_submit_button("Set Wife ✓")
 
-    if st.button("💑 Generate Compatibility Report", use_container_width=True, type="primary"):
+    if st.button("💑 Generate Compatibility Report", width='stretch', type="primary"):
         if not n1.strip() or not n2.strip():
             st.error("Please enter names for both partners.")
         else:
@@ -716,12 +741,14 @@ elif mode == "💑 Spouse Compatibility":
                 lat1,lon1 = geocode(p1); lat2,lon2 = geocode(p2)
                 chart1 = compute_chart(n1, d1, t1, lat1, lon1)
                 chart2 = compute_chart(n2, d2, t2, lat2, lon2)
-                milan  = __import__('engine.interpret', fromlist=['calc_ashtakoot']).calc_ashtakoot(chart1, chart2)
+                from engine.interpret import calc_ashtakoot as _cak
+                milan  = _cak(chart1, chart2)
 
             st.success("Compatibility analysis complete!")
             st.markdown("---")
 
-            from engine.interpret import compute_combined_year_scores, compute_year_scores as _cys
+            # compute_combined_year_scores and _cys available at module level
+            _cys = compute_year_scores
             import pandas as pd_lib
             cs_data_compat = compute_combined_year_scores(chart1, chart2, 2025, 2035)
             s1_data_compat = _cys(chart1, 2025, 2035)
@@ -757,7 +784,7 @@ elif mode == "💑 Spouse Compatibility":
                          f"{n2[:8]} Score":r["score2"],
                          "Combined":r["combined"],"Category":r["category"]}
                         for r in cs_data_compat]
-                st.dataframe(pd_lib.DataFrame(rows), hide_index=True, use_container_width=True)
+                st.dataframe(pd_lib.DataFrame(rows), hide_index=True, width='stretch')
 
             with tab4:
                 render_year_forecast(chart1, label=n1, yr_from=2025, yr_to=2035)
@@ -785,10 +812,37 @@ elif mode == "💑 Spouse Compatibility":
 
             with tab7:
                 report_text = generate_compatibility_report(chart1, chart2, p1, p2)
-                st.text_area("", report_text, height=500, label_visibility="collapsed")
+                st.text_area("Compatibility Report", report_text, height=500, label_visibility="collapsed")
                 st.download_button("⬇ Download Compatibility Report (.txt)", report_text,
                                    file_name=f"Compatibility_{n1}_{n2}.txt",
-                                   mime="text/plain", use_container_width=True)
+                                   mime="text/plain", width='stretch')
+
+            # ── Enhanced Report Downloads (Infographic + Document) ──────────────
+            st.markdown("---")
+            with st.expander("📦 Download Enhanced Reports (Infographic & Document)"):
+                from ui.report_html import generate_combined_html as _gch
+                from ui.report_docx import generate_combined_docx as _gcd
+                import datetime as _dt_c
+                _yf_c = _dt_c.date.today().year - 2
+                _yt_c = _dt_c.date.today().year + 25
+                _cs_c  = compute_combined_year_scores(chart1, chart2, _yf_c, _yt_c)
+                _s1_c  = compute_year_scores(chart1, _yf_c, _yt_c)
+                _s2_c  = compute_year_scores(chart2, _yf_c, _yt_c)
+                _pr1_c = generate_dasha_predictions(chart1, _yf_c, _yt_c)
+                _pr2_c = generate_dasha_predictions(chart2, _yf_c, _yt_c)
+                _html_c = _gch(chart1, chart2, n1, n2, p1, p2, d1, d2, t1, t2,
+                               _cs_c, _s1_c, _s2_c, _pr1_c, _pr2_c).encode("utf-8")
+                _docx_c = _gcd(chart1, chart2, n1, n2, p1, p2, d1, d2, t1, t2,
+                               _cs_c, _s1_c, _s2_c, _pr1_c, _pr2_c)
+                _dc1_c, _dc2_c = st.columns(2)
+                _dc1_c.download_button("📊 Infographic Report (.html)", _html_c,
+                    file_name=f"Compatibility_{n1}_{n2}_Infographic.html",
+                    mime="text/html", width='stretch', type="primary")
+                _dc2_c.download_button("📄 Document Report (.docx)", _docx_c,
+                    file_name=f"Compatibility_{n1}_{n2}_Report.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    width='stretch')
+                st.caption("📊 Infographic opens in any browser with visual charts and color-coded predictions. 📄 Document opens in Word or Google Docs with full narrative.")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MODE: COMBINED 25-YEAR REPORT
@@ -817,7 +871,7 @@ elif mode == "🌟 Combined 25-Year Report":
     yr_from = ycols[0].number_input("From Year", 2025, 2060, 2026, key="yfrom")
     yr_to   = ycols[1].number_input("To Year",   2025, 2060, 2050, key="yto")
 
-    if st.button("🌟 Generate Combined Report", use_container_width=True, type="primary"):
+    if st.button("🌟 Generate Combined Report", width='stretch', type="primary"):
         if not n1.strip() or not n2.strip():
             st.error("Please enter names for both partners.")
         else:
@@ -897,10 +951,34 @@ elif mode == "🌟 Combined 25-Year Report":
                          f"{n2[:8]} Score":r["score2"],
                          "Combined":r["combined"],"Category":r["category"]}
                         for r in cs_data]
-                st.dataframe(pd_lib.DataFrame(rows), hide_index=True, use_container_width=True)
+                st.dataframe(pd_lib.DataFrame(rows), hide_index=True, width='stretch')
 
             with tab6:
-                st.text_area("", report_text, height=600, label_visibility="collapsed")
+                st.text_area("Combined Report", report_text, height=600, label_visibility="collapsed")
                 st.download_button("⬇ Download Combined Report (.txt)", report_text,
                                    file_name=f"Dampati_{n1}_{n2}_Combined_Report.txt",
-                                   mime="text/plain", use_container_width=True)
+                                   mime="text/plain", width='stretch')
+
+            # ── Enhanced Report Downloads (Infographic + Document) ──────────────
+            st.markdown("---")
+            with st.expander("📦 Download Enhanced Reports (Infographic & Document)"):
+                from ui.report_html import generate_combined_html as _gch_m
+                from ui.report_docx import generate_combined_docx as _gcd_m
+                _cs_m  = compute_combined_year_scores(chart1, chart2, yr_from, yr_to)
+                _s1_m  = compute_year_scores(chart1, yr_from, yr_to)
+                _s2_m  = compute_year_scores(chart2, yr_from, yr_to)
+                _pr1_m = generate_dasha_predictions(chart1, yr_from, yr_to)
+                _pr2_m = generate_dasha_predictions(chart2, yr_from, yr_to)
+                _html_m = _gch_m(chart1, chart2, n1, n2, p1, p2, d1, d2, t1, t2,
+                                 _cs_m, _s1_m, _s2_m, _pr1_m, _pr2_m).encode("utf-8")
+                _docx_m = _gcd_m(chart1, chart2, n1, n2, p1, p2, d1, d2, t1, t2,
+                                 _cs_m, _s1_m, _s2_m, _pr1_m, _pr2_m)
+                _dc1_m, _dc2_m = st.columns(2)
+                _dc1_m.download_button("📊 Infographic Report (.html)", _html_m,
+                    file_name=f"Dampati_{n1}_{n2}_Infographic.html",
+                    mime="text/html", width='stretch', type="primary")
+                _dc2_m.download_button("📄 Document Report (.docx)", _docx_m,
+                    file_name=f"Dampati_{n1}_{n2}_Report.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    width='stretch')
+                st.caption("📊 Infographic opens in any browser with visual charts and color-coded predictions. 📄 Document opens in Word or Google Docs with full narrative.")
