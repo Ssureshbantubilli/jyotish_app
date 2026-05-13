@@ -28,6 +28,7 @@ from engine.interpret import (
     calc_ashtakoot,
 )
 from engine import generate_dasha_predictions
+from engine.predictions import compute_marriage_timing
 
 # ── PAGE CONFIG ──────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -166,9 +167,12 @@ def score_badge(cat: str, score: float) -> str:
     return f'<span class="score-badge-{cls}">{score:.1f} — {cat}</span>'
 
 def render_chart_overview(c: dict, place: str):
+    from ui.chakra import chakra_svg
+
     lagna_s = c["lagna_sign"]
     moon_s  = c["moon_sign"]
 
+    # ── summary pills ────────────────────────────────────────────────────────
     cols = st.columns(4)
     with cols[0]:
         st.markdown(f"**{SIGN_GLYPHS[lagna_s]} Lagna**")
@@ -186,6 +190,39 @@ def render_chart_overview(c: dict, place: str):
         st.markdown("**📅 Active Dasha**")
         st.markdown(f"**{c['active_md']['lord']} MD — {c['active_ad']['lord']} AD**")
         st.caption(f"MD ends: {c['active_md']['end'].strftime('%b %Y')}")
+
+    # ── Jathaka Chakra ───────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 🔯 Jathaka Chakra (South Indian Rasi Chart)")
+
+    _svg = chakra_svg(c, c.get("name", ""), size=480)
+    # Centre the SVG with a responsive wrapper
+    st.markdown(
+        f'<div style="display:flex;justify-content:center;margin:8px 0;">'
+        f'{_svg}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Compact planet legend below the chart
+    P_SHORT_LEG = {"Surya":"Su","Chandra":"Mo","Budha":"Me","Shukra":"Ve",
+                   "Mangal":"Ma","Guru":"Ju","Shani":"Sa","Rahu":"Ra","Ketu":"Ke"}
+    P_COLOR_LEG = {"Surya":"#FFB84D","Chandra":"#B0C8FF","Budha":"#72E872",
+                   "Shukra":"#FFB0D0","Mangal":"#FF6666","Guru":"#FFE050",
+                   "Shani":"#B8B8CC","Rahu":"#7AD8C0","Ketu":"#D8A870"}
+    badge_parts = []
+    for pname, pshort in P_SHORT_LEG.items():
+        col = P_COLOR_LEG[pname]
+        badge_parts.append(
+            f'<span style="background:#1A1035;border:1px solid {col};border-radius:4px;'
+            f'padding:2px 7px;margin:2px;font-size:0.78rem;color:{col};font-weight:600">'
+            f'{pshort} = {pname}</span>'
+        )
+    st.markdown(
+        f'<div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:center;'
+        f'margin-top:4px;">{"".join(badge_parts)}</div>',
+        unsafe_allow_html=True,
+    )
 
 def render_planets(c: dict):
     st.markdown("#### 🪐 Planetary Positions (Nirayana Sidereal)")
@@ -641,6 +678,137 @@ def render_combined_predictions_tab(chart1: dict, chart2: dict,
                     st.markdown(f"💫 **Counsel:** {g['focus'][:200]}…")
 
 
+def render_marriage_predictions(chart: dict, name: str):
+    """
+    Render marriage timing predictions based on:
+    - 7th house lord position and strength
+    - Venus placement and dignity
+    - Dasha periods favorable for marriage
+    """
+    marriage_data = compute_marriage_timing(chart)
+    
+    st.markdown("""
+    <div style="background:#1A0A30;border:1px solid #8040C0;border-radius:10px;padding:0.9rem;margin-bottom:1rem;">
+      <b style="color:#D0A0FF;font-size:1rem;">💒 Marriage Predictions — Vivaha Yoga Analysis</b><br>
+      <span style="color:#8080A0;font-size:0.82rem;">
+        Per BPHS Ch.26 (Vivaha) • Brihat Jataka • Phaladeepika • Uttara Kalamrita
+      </span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Main prediction banner
+    status_color = {"Highly Auspicious Window Approaching":"#40D060",
+                   "Auspicious Window in Near Term":"#60A0F0",
+                   "Distant but Indicated":"#E0A040",
+                   "Timing has passed in natal chart timeline":"#F06060"}.get(marriage_data["status"], "#8080A0")
+    status_bg = {"Highly Auspicious Window Approaching":"#0A2010",
+                "Auspicious Window in Near Term":"#0A1028",
+                "Distant but Indicated":"#201400",
+                "Timing has passed in natal chart timeline":"#200808"}.get(marriage_data["status"], "#0E1117")
+    
+    st.markdown(f"""
+    <div style="background:{status_bg};border:2px solid {status_color};border-radius:10px;padding:1rem;margin-bottom:1rem;">
+      <b style="color:{status_color};font-size:1.1rem;">💒 {marriage_data['status']}</b><br>
+      <span style="color:#C0C0D0;font-size:0.9rem;">
+        Current Age: {marriage_data['current_age']} | Predicted Marriage Age: {marriage_data['predicted_age']} | 
+        Expected Year: {marriage_data['expected_year']} (~{marriage_data['years_away']} years away)
+      </span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 7th House Analysis
+    st.markdown("#### 🏛️ 7th House Analysis (Marriage & Partnerships)")
+    col7a, col7b = st.columns(2)
+    with col7a:
+        st.markdown(f"""
+        <div style="background:#0E1117;border:1px solid #2A2A3A;border-radius:8px;padding:0.75rem;margin-bottom:0.6rem;">
+          <b style="color:#E8D8A8;">7th Lord: {marriage_data['seventh_lord']}</b><br>
+          <span style="color:#B0B0C0;font-size:0.85rem;">
+            House: {marriage_data['seventh_lord_house']} | Sign: {marriage_data['seventh_lord_sign']}<br>
+            Dignity: <b style="color:#{'40D060' if marriage_data['seventh_lord_strong'] else 'F06060'}">{marriage_data['seventh_lord_dignity']}</b>
+          </span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col7b:
+        st.markdown(f"""
+        <div style="background:#0E1117;border:1px solid #2A2A3A;border-radius:8px;padding:0.75rem;margin-bottom:0.6rem;">
+          <b style="color:#E8D8A8;">Venus (Marriage Karaka)</b><br>
+          <span style="color:#B0B0C0;font-size:0.85rem;">
+            House: {marriage_data['venus_house']} | Sign: {marriage_data['venus_sign']}<br>
+            Dignity: <b style="color:#{'40D060' if marriage_data['venus_strong'] else 'F06060'}">{marriage_data['venus_dignity']}</b>
+          </span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Shastra Reference
+    st.markdown(f"""
+    <div style="background:#08060E;border-left:3px solid #7040C0;padding:0.7rem 1rem;
+                border-radius:0 6px 6px 0;margin-bottom:0.9rem;">
+      <span style="color:#C090FF;font-size:0.83rem;font-style:italic;">{marriage_data['shastra_ref']}</span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Auspicious Dasha Periods
+    if marriage_data['auspicious_periods']:
+        st.markdown("#### 🗓️ Auspicious Dasha Periods for Marriage")
+        for period in marriage_data['auspicious_periods']:
+            period_color = "#D0A0FF" if period['type'].startswith("Venus") else "#A0C8F0"
+            period_bg = "#0A0810" if period['type'].startswith("Venus") else "#0A0820"
+            st.markdown(f"""
+            <div style="background:{period_bg};border:1px solid {period_color}55;border-radius:7px;padding:0.65rem 0.9rem;margin-bottom:0.55rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <b style="color:{period_color};">💫 {period['type']}</b>
+                <span style="font-size:0.78rem;color:#888;">{period['strength']}</span>
+              </div>
+              <span style="color:#C0C0D0;font-size:0.85rem;">
+                {period['start'].strftime('%b %Y')} – {period['end'].strftime('%b %Y')} 
+                ({(period['end'].year - period['start'].year + (period['end'].month - period['start'].month)/12):.1f} years)
+              </span>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("---")
+    
+    # Guidance & Remedies
+    st.markdown("#### 🪔 Guidance & Remedies for Marriage")
+    st.markdown(f"""
+    <div style="background:#0A1018;border:1px solid #2A3848;border-radius:7px;padding:0.8rem;margin-bottom:0.8rem;">
+      <b style="color:#A0C8E0;">💫 Jyotishi's Counsel</b>
+      <p style="color:#B8C8D8;font-size:0.85rem;margin:0.45rem 0 0;line-height:1.6;">{marriage_data['guidance']}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Marriage remedies
+    st.markdown("#### 🛕 Vedic Remedies (Upaya) for Marriage")
+    rem_col1, rem_col2, rem_col3 = st.columns(3)
+    
+    with rem_col1:
+        st.markdown("**🪔 Venus Worship (for Shukra)**")
+        st.caption(
+            "Observe Shukra Vrata (Fridays)\n\n"
+            "Mantra: 'Om Dram Drim Draum Sah Shukraya Namah' 108x\n\n"
+            "Donate: White flowers, white rice, milk, silver ornaments to temple"
+        )
+    
+    with rem_col2:
+        st.markdown("**👰 Parvati & Shiva Worship**")
+        st.caption(
+            "Invoke the Divine Pair for harmonious marriage\n\n"
+            "Per Rigveda 10.85: Vivaha Sukta chanting\n\n"
+            "Perform on Fridays & Full Moon (Purnima) days"
+        )
+    
+    with rem_col3:
+        st.markdown("**🙏 7th Lord Strengthening**")
+        st.caption(
+            f"Worship the lord of the 7th house: {marriage_data['seventh_lord']}\n\n"
+            "Strengthen through mantra & charity\n\n"
+            "Per BPHS: Appease 7th lord through its deity"
+        )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MODE: INDIVIDUAL
 # ═══════════════════════════════════════════════════════════════════════════
@@ -660,8 +828,8 @@ if mode == "🔮 Individual Report":
             st.success(f"Chart computed for **{name}** | Lat: {lat:.4f}°N Lon: {lon:.4f}°E")
             st.markdown("---")
 
-            tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-                ["🗺️ Chart Overview","🪐 Planets","✨ Yogas","🗓️ Dashas","📈 Forecast","🔮 Predictions"])
+            tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+                ["🗺️ Chart Overview","🪐 Planets","✨ Yogas","🗓️ Dashas","📈 Forecast","🔮 Predictions","💒 Marriage"])
 
             with tab1:
                 render_chart_overview(chart, place)
@@ -685,6 +853,9 @@ if mode == "🔮 Individual Report":
                 _yr_from = _dt.date.today().year - 2
                 _yr_to   = _dt.date.today().year + 25
                 render_predictions_tab(chart, name, _yr_from, _yr_to)
+
+            with tab7:
+                render_marriage_predictions(chart, name)
 
             # Full text report download
             with st.expander("📄 Full Text Report (BPHS Style)"):

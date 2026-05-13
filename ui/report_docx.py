@@ -181,6 +181,7 @@ def _add_overview(doc, chart, place):
     _kv(doc, "Lagna (Ascendant)", f"{chart['lagna_san']} ({chart['lagna_en']}) — {chart['lagna_deg']:.1f}° | Lord: {chart['lagna_lord']}")
     _kv(doc, "Janma Rashi",       f"{chart['moon_san']} ({chart['moon_en']}) — {chart['moon_deg']:.1f}°")
     _kv(doc, "Janma Nakshatra",   f"{chart['nakshatra']}, Pada {chart['nak_pada']} | Lord: {chart['nak_lord']} | Deity: {chart['nak_deity']}")
+    _kv(doc, "Janma Tithi",      f"{chart['tithi']} — {chart.get('tithi_name','')} | {chart.get('paksha','')}")
     _kv(doc, "Active Maha Dasha", f"{chart['active_md']['lord']} MD — ends {chart['active_md']['end'].strftime('%b %Y')}")
     _kv(doc, "Active Antardasha", f"{chart['active_ad']['lord']} AD — ends {chart['active_ad']['end'].strftime('%b %Y')}")
     _kv(doc, "Place of Birth",    place)
@@ -418,6 +419,25 @@ def _add_combined_protection(doc, cs_all, n1, n2):
             else: rr.font.color.rgb = RGBColor(0xC0,0xB8,0xD8)
     doc.add_paragraph()
 
+def _add_chakra(doc, chart, name=""):
+    """Render Jathaka Chakra as PNG and embed centred in the document."""
+    from ui.chakra import chakra_png
+    _heading(doc, "🔯 Jathaka Chakra (South Indian Rasi Chart)", 1)
+    _para(doc,
+          "The Rasi Chakra shows all 12 Bhavas (houses) in the South Indian fixed-sign format. "
+          "House numbers appear top-left of each cell; the Lagna (↑) cell is highlighted. "
+          "Planet abbreviations: Su=Surya, Mo=Chandra, Ma=Mangal, Me=Budha, Ju=Guru, "
+          "Ve=Shukra, Sa=Shani, Ra=Rahu, Ke=Ketu.",
+          color=MUTED, size=9)
+    png_bytes = chakra_png(chart, name, figsize=5.5)
+    img_stream = io.BytesIO(png_bytes)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run()
+    run.add_picture(img_stream, width=Inches(5.0))
+    doc.add_paragraph()
+
+
 def _make_doc():
     doc = Document()
     for section in doc.sections:
@@ -450,6 +470,8 @@ def generate_individual_docx(chart, name, place, dob, tob_h, year_scores, predic
         meta_lines=[f"Date of Birth: {dob_str}   |   Time: {tob_str}", f"Place of Birth: {place}"])
     doc.add_page_break()
     _add_overview(doc, chart, place)
+    _divider(doc)
+    _add_chakra(doc, chart, name)
     _divider(doc)
     _add_planets(doc, chart)
     doc.add_page_break()
@@ -499,9 +521,11 @@ def generate_combined_docx(chart1, chart2, n1, n2, place1, place2,
     _divider(doc)
     _heading(doc, f"👨 {n1} — Chart Overview", 1)
     _add_overview(doc, chart1, place1)
+    _add_chakra(doc, chart1, n1)
     _divider(doc)
     _heading(doc, f"👩 {n2} — Chart Overview", 1)
     _add_overview(doc, chart2, place2)
+    _add_chakra(doc, chart2, n2)
 
     doc.add_page_break()
     _heading(doc, f"🪐 {n1} — Planetary Positions", 1)

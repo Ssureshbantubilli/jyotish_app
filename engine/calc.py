@@ -145,41 +145,93 @@ def calc_moon(T: float) -> tuple:
 
     return norm360(Lm + dL), norm360(Om)
 
-def calc_mercury(T: float, sun_trop: float, M_sun: float) -> float:
-    L = norm360(178.1799 + 149472.5153*T)
-    M = norm360(168.6562 + 149472.5153*T)
-    eq = 23.4400*math.sin(math.radians(M)) + 2.9818*math.sin(2*math.radians(M))
-    return norm360(L + eq + sun_trop - M_sun)
+# ── ACCURATE PLANETARY POSITIONS (Meeus Ch.25/31 + VSOP87 low-precision) ────
+# Orbital elements at J2000.0 referred to mean ecliptic & equinox of J2000.0
+# Format: (L0, L1, a, e0, e1, i0, i1, Om0, Om1, w0, w1)
+# L = mean longitude (deg), a = semi-major axis (AU),
+# e = eccentricity, i = inclination (deg),
+# Om = longitude of ascending node (deg),
+# w  = longitude of perihelion (deg)
+# Rates are per Julian century T.  Sources: Meeus Table 31.a + USNO
 
-def calc_venus(T: float, sun_trop: float, M_sun: float) -> float:
-    L = norm360(212.2600 + 58517.8027*T)
-    M = norm360(212.2600 + 58517.8027*T)
-    eq = 0.7758*math.sin(math.radians(M)) + 0.0033*math.sin(2*math.radians(M))
-    return norm360(L + eq + sun_trop - M_sun)
+_ORB = {
+    # planet:  L0,           L1,              a,           e0,          e1,
+    #          i0,         i1,           Om0,        Om1,         w0,          w1
+    "Mercury": (252.250906, 149472.6746358, 0.38709831,  0.20563175,  0.000020407,
+                7.004986,  -0.0059516,    48.330893,  -0.1254229,  77.456119,   0.1588643),
+    "Venus":   (181.979801,  58517.8156760, 0.72332982,  0.00677188, -0.000047766,
+                3.394662,  -0.0008568,    76.679920,  -0.2780080, 131.563703,   0.0048746),
+    "Earth":   (100.466457,  35999.3728565, 1.000001018, 0.01670862, -0.000042037,
+                0.0,        0.0,           0.0,         0.0,        102.937348,  0.3225557),
+    "Mars":    (355.433000,  19140.2993313, 1.52366231,  0.09341233, -0.000090484,
+                1.849726,  -0.0006011,    49.558093,  -0.2950250, 336.060234,   0.4439016),
+    "Jupiter": ( 34.351519,   3034.9056606, 5.20248019,  0.04853590,  0.000016322,
+                1.303270,  -0.0054966,   100.292990,   0.1334985,  14.331172,   0.2155209),
+    "Saturn":  ( 50.077444,   1222.1138488, 9.54149883,  0.05550825, -0.000346641,
+                2.488878,  -0.0037363,   113.665503,  -0.2566722,  93.056787,   0.5665496),
+}
+
+
+def _kepler(M_deg: float, e: float) -> float:
+    """Solve Kepler's equation M = E - e*sin(E); return true anomaly (degrees)."""
+    M = math.radians(M_deg % 360.0)
+    E = M  # initial guess
+    for _ in range(50):
+        dE = (M - E + e * math.sin(E)) / (1.0 - e * math.cos(E))
+        E += dE
+        if abs(dE) < 1e-10:
+            break
+    # True anomaly
+    v = 2.0 * math.atan2(
+        math.sqrt(1 + e) * math.sin(E / 2),
+        math.sqrt(1 - e) * math.cos(E / 2)
+    )
+    return math.degrees(v)
+
+
+def _helio_xyz(T: float, planet: str) -> tuple:
+    """Return heliocentric ecliptic rectangular coordinates (x, y, z) in AU."""
+    L0, L1, a, e0, e1, i0, i1, Om0, Om1, w0, w1 = _ORB[planet]
+    L   = norm360(L0 + L1 * T)
+    e   = e0 + e1 * T
+    i   = math.radians(i0 + i1 * T)
+    Om  = math.radians(norm360(Om0 + Om1 * T))
+    w   = math.radians(norm360(w0  + w1  * T))
+    M   = norm360(L - math.degrees(w))
+    v   = math.radians(_kepler(M, e))
+    r   = a * (1 - e * e) / (1 + e * math.cos(v))
+    u   = v + (w - Om)  # argument of latitude = true_anomaly + argument_of_perihelion
+
+    # Heliocentric ecliptic rectangular
+    x = r * (math.cos(Om) * math.cos(u) - math.sin(Om) * math.sin(u) * math.cos(i))
+    y = r * (math.sin(Om) * math.cos(u) + math.cos(Om) * math.sin(u) * math.cos(i))
+    z = r * math.sin(u) * math.sin(i)
+    return x, y, z
+
+
+def _geo_ecliptic_lon(T: float, planet: str) -> float:
+    """Geocentric ecliptic longitude (tropical degrees) via helio→geo conversion."""
+    xp, yp, zp = _helio_xyz(T, planet)
+    xe, ye, ze = _helio_xyz(T, "Earth")
+    dx, dy, dz = xp - xe, yp - ye, zp - ze
+    lam = math.degrees(math.atan2(dy, dx))
+    return norm360(lam)
+
+
+def calc_mercury(T: float, sun_trop: float = 0, M_sun: float = 0) -> float:
+    return _geo_ecliptic_lon(T, "Mercury")
+
+def calc_venus(T: float, sun_trop: float = 0, M_sun: float = 0) -> float:
+    return _geo_ecliptic_lon(T, "Venus")
 
 def calc_mars(T: float) -> float:
-    L = norm360(293.737 + 19140.30*T)
-    M = norm360(319.529 + 19140.30*T)
-    eq = (10.6418*math.sin(math.radians(M))
-          + 0.6210*math.sin(2*math.radians(M))
-          + 0.0505*math.sin(3*math.radians(M)))
-    return norm360(L + eq)
+    return _geo_ecliptic_lon(T, "Mars")
 
 def calc_jupiter(T: float) -> float:
-    L = norm360(238.049 + 3034.906*T)
-    M = norm360(225.328 + 3034.906*T)
-    eq = (5.5549*math.sin(math.radians(M))
-          + 0.1683*math.sin(2*math.radians(M))
-          - 0.0071*math.sin(3*math.radians(M)))
-    return norm360(L + eq)
+    return _geo_ecliptic_lon(T, "Jupiter")
 
 def calc_saturn(T: float) -> float:
-    L = norm360(266.564 + 1222.114*T)
-    M = norm360(175.466 + 1221.552*T)
-    eq = (6.3585*math.sin(math.radians(M))
-          + 0.2204*math.sin(2*math.radians(M))
-          - 0.0106*math.sin(3*math.radians(M)))
-    return norm360(L + eq)
+    return _geo_ecliptic_lon(T, "Saturn")
 
 def calc_lagna(T: float, jd: float, ut_hours: float, lat: float, lon: float) -> float:
     """Tropical Ascendant using GMST → LST → atan2 formula."""
@@ -219,6 +271,21 @@ def get_nakshatra(moon_sid: float) -> tuple:
     pada     = int(nak_deg / (nak_span/4)) + 1
     elapsed  = nak_deg / nak_span
     return nak_num, pada, elapsed
+
+def get_paksha(tithi: int) -> str:
+    if 1 <= tithi <= 15:
+        return "Shukla Paksha (bright half of the lunar month)"
+    return "Krishna Paksha (dark half of the lunar month)"
+
+def get_tithi_name(tithi: int) -> str:
+    if tithi == 15:
+        return "Purnima (Full Moon)"
+    if tithi == 30:
+        return "Amavasya (New Moon)"
+    if 1 <= tithi <= 15:
+        return f"Shukla {tithi} Tithi"
+    return f"Krishna {tithi - 15} Tithi"
+
 
 def dasha_balance_and_sequence(moon_sid: float, birth_date: datetime.date) -> list:
     """
@@ -503,8 +570,12 @@ def compute_chart(name: str, dob: datetime.date, tob_h: float, lat: float, lon: 
     # Yogas
     yogas = detect_yogas(planets, lagna_sign)
 
-    # Tithi (approx)
-    tithi_num = int((norm360(moon_trop - sun_trop)) / 12) + 1
+    # Tithi (approx) using sidereal Moon and Sun positions for Vedic moon calendar.
+    tithi_num = int((norm360(moon_sid - sun_sid)) / 12) + 1
+    if tithi_num > 30:
+        tithi_num = 30
+    paksha = get_paksha(tithi_num)
+    tithi_name = get_tithi_name(tithi_num)
 
     return {
         "name":          name,
@@ -532,6 +603,8 @@ def compute_chart(name: str, dob: datetime.date, tob_h: float, lat: float, lon: 
         "nak_deity":     NAK_DEITY[nak_num],
         "nak_symbol":    NAK_SYMBOL[nak_num],
         "tithi":         tithi_num,
+        "paksha":        paksha,
+        "tithi_name":    tithi_name,
         "planets":       planets,
         "houses":        houses,
         "dasha_seq":     dasha_seq,

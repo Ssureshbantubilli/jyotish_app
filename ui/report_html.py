@@ -182,12 +182,27 @@ def _overview_cards_html(chart, place):
         <div class="sub">Lord: {chart["nak_lord"]} | Deity: {chart["nak_deity"]}</div>
       </div>
       <div class="metric-card">
+        <div class="glyph">🌙</div>
+        <div class="label">Janma Tithi</div>
+        <div class="value">{chart["tithi"]} — {chart.get("tithi_name","")}</div>
+        <div class="sub">{chart.get("paksha","")}</div>
+      </div>
+      <div class="metric-card">
         <div class="glyph">📅</div>
         <div class="label">Active Dasha</div>
         <div class="value">{chart["active_md"]["lord"]} MD – {chart["active_ad"]["lord"]} AD</div>
         <div class="sub">MD ends: {chart["active_md"]["end"].strftime("%b %Y")}</div>
       </div>
     </div>"""
+
+def _chakra_html(chart, name=""):
+    """Embed SVG Jathaka Chakra inline in HTML."""
+    from ui.chakra import chakra_svg
+    svg = chakra_svg(chart, name, size=440)
+    return (
+        f'<div style="display:flex;justify-content:center;'
+        f'padding:12px 0 8px;">{svg}</div>'
+    )
 
 def _year_chart_js(year_scores, chart_id, score_key="score"):
     years  = [r["year"] for r in year_scores]
@@ -260,26 +275,44 @@ def _predictions_html(preds):
             for area, text in list(p["life_areas"].items())[:5]
         )
         g_data  = p.get("guidance", {})
+        # Antardasha section
+        antardashas_html = ""
+        if p.get("antardashas"):
+            antardashas_html += '<div class="pred-guidance"><div class="pred-guidance-title">🗓️ Antardasha Sub-Periods</div>'
+            for ad in p["antardashas"]:
+              ac = COLOR_MAP.get(ad["category"], "#8080A0")
+              now = " ◄ ACTIVE" if ad["is_current"] else ""
+              antardashas_html += f'<div style="margin-bottom:8px;padding:8px;border-left:3px solid {ac};background:#181828;border-radius:6px">'
+              antardashas_html += f'<b style="color:{ac}">{p["lord"]}/{ad["lord"]} Antardasha{now}</b> '
+              antardashas_html += f'<span style="color:#888;font-size:0.82rem">({ad["start"].strftime("%b %Y")} – {ad["end"].strftime("%b %Y")}) | Score {ad["score"]}/10 — {ad["category"]}</span>'
+              antardashas_html += f'<div style="color:#B0B0C0;font-size:0.84rem;margin-top:4px">{ad["prediction"]}</div>'
+              antardashas_html += '</div>'
+            antardashas_html += '</div>'
+
+        # Upaya & Guidance section
+        guidance_html = '<div class="pred-guidance"><div class="pred-guidance-title">🪔 Upaya & Jyotishi\'s Counsel</div>'
+        guidance_html += f'<p style="color:#A0B8C0;font-size:0.82rem;margin-bottom:6px">🕉️ <b>Mantra:</b> {g_data.get("mantra", "Not specified")}</p>'
+        guidance_html += f'<p style="color:#A0A8C0;font-size:0.82rem;margin-bottom:6px">🌸 <b>Dana:</b> {g_data.get("charity", "Not specified")}</p>'
+        guidance_html += f'<p style="color:#A0A8C0;font-size:0.82rem;margin-bottom:6px">🛕 <b>Pilgrimage:</b> {g_data.get("pilgrimage", "Not specified")}</p>'
+        guidance_html += f'<div class="pred-guidance-text">💫 {g_data.get("focus", "No counsel provided.")}</div>'
+        guidance_html += '</div>'
+
         html += f"""
-        <div class="pred-block">
-          <div class="pred-header" style="background:{bg};border-bottom:1px solid {col}44">
-            <span class="pred-lord" style="color:{col}">{g} {p["lord"]} Maha Dasha{tag}</span>
-            <span class="pred-period">{p["start"].strftime("%b %Y")} – {p["end"].strftime("%b %Y")} &nbsp;·&nbsp; {p["years"]:.1f} yrs &nbsp;·&nbsp; {_badge(p["category"])}</span>
-          </div>
-          <div class="pred-body">
-            <div class="pred-shastra">{p.get("shastra_ref","")}</div>
-            <p style="color:#B0A8C0;font-size:0.85rem;margin-bottom:12px">
-              <b>House {p["house"]} in {p["sign"]}</b> — {p["dignity"]} &nbsp;|&nbsp; {p.get("quality_note","")}
-            </p>
-            <div class="pred-areas">{areas_html}</div>
-            <div class="pred-guidance">
-              <div class="pred-guidance-title">🪔 Upaya & Jyotishi's Counsel</div>
-              <p style="color:#A0B8C0;font-size:0.82rem;margin-bottom:6px">🕉️ <b>Mantra:</b> {g_data.get("mantra","")}</p>
-              <p style="color:#A0A8C0;font-size:0.82rem;margin-bottom:6px">🌸 <b>Dana:</b> {g_data.get("charity","")}</p>
-              <div class="pred-guidance-text">💫 {g_data.get("focus","")}</div>
-            </div>
-          </div>
-        </div>"""
+<div class="pred-block">
+  <div class="pred-header" style="background:{bg};border-bottom:1px solid {col}44">
+    <span class="pred-lord" style="color:{col}">{g} {p["lord"]} Maha Dasha{tag}</span>
+    <span class="pred-period">{p["start"].strftime("%b %Y")} – {p["end"].strftime("%b %Y")} &nbsp;·&nbsp; {p["years"]:.1f} yrs &nbsp;·&nbsp; {_badge(p["category"])} </span>
+  </div>
+  <div class="pred-body">
+    <div class="pred-shastra">{p.get("shastra_ref","")}</div>
+    <p style="color:#B0A8C0;font-size:0.85rem;margin-bottom:12px">
+      <b>House {p["house"]} in {p["sign"]}</b> — {p["dignity"]} &nbsp;|&nbsp; {p.get("quality_note","")}
+    </p>
+    <div class="pred-areas">{areas_html}</div>
+    {antardashas_html}
+    {guidance_html}
+  </div>
+</div>"""
     return html
 
 def _combined_protection_table(cs_all, n1, n2):
@@ -364,6 +397,16 @@ def generate_individual_html(chart, name, place, dob, tob_h, year_scores, predic
     <div class="section">
       <div class="section-title">🗺️ Chart Overview</div>
       {_overview_cards_html(chart, place)}
+    </div>
+
+    <div class="section">
+      <div class="section-title">🔯 Jathaka Chakra (South Indian Rasi Chart)</div>
+      {_chakra_html(chart, name)}
+      <p style="color:#6060A0;font-size:0.78rem;text-align:center;margin-top:6px">
+        House numbers shown top-left of each cell · Lagna (↑) marked in gold ·
+        Su=Surya · Mo=Chandra · Ma=Mangal · Me=Budha · Ju=Guru · Ve=Shukra ·
+        Sa=Shani · Ra=Rahu · Ke=Ketu
+      </p>
     </div>
 
     <div class="section">
@@ -471,6 +514,24 @@ def generate_combined_html(chart1, chart2, n1, n2, place1, place2,
         <div class="partner-card"><div class="partner-title">👨 {n1}</div>{_overview_cards_html(chart1, place1)}</div>
         <div class="partner-card"><div class="partner-title">👩 {n2}</div>{_overview_cards_html(chart2, place2)}</div>
       </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">🔯 Jathaka Chakra — Rasi Charts</div>
+      <div class="partner-section">
+        <div class="partner-card">
+          <div class="partner-title">👨 {n1}</div>
+          {_chakra_html(chart1, n1)}
+        </div>
+        <div class="partner-card">
+          <div class="partner-title">👩 {n2}</div>
+          {_chakra_html(chart2, n2)}
+        </div>
+      </div>
+      <p style="color:#6060A0;font-size:0.78rem;text-align:center;margin-top:8px">
+        Su=Surya · Mo=Chandra · Ma=Mangal · Me=Budha · Ju=Guru · Ve=Shukra ·
+        Sa=Shani · Ra=Rahu · Ke=Ketu · Lagna (↑) in gold
+      </p>
     </div>
 
     <div class="section">
